@@ -29,12 +29,18 @@ key_file = "keyfile.key"
 # TRANSFORMS
 # ============================================
 
-# Parse JSON logs
+# Parse JSON logs (with graceful error handling)
 [transforms.parse_json]
 type = "remap"
 inputs = ["kafka_source"]
 source = '''
-. = parse_json!(.message)
+parsed, err = parse_json(.message)
+if err == null {
+    . = parsed
+} else {
+    .parse_error = err
+    .raw_message = .message
+}
 '''
 
 # Add metadata fields
