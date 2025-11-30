@@ -1,0 +1,81 @@
+# Vector Configuration
+# Migrated from Logstash configuration
+# Documentation: https://vector.dev/docs/
+
+# Global options
+data_dir = "/var/lib/vector"
+
+# ============================================
+# SOURCES
+# ============================================
+
+# Kafka source with TLS configuration
+[sources.kafka_source]
+type = "kafka"
+bootstrap_servers = "kafka.example.com:9093"
+group_id = "vector-consumer-group"
+topics = ["logs"]
+auto_offset_reset = "earliest"
+
+# TLS configuration using existing certificates
+[sources.kafka_source.tls]
+enabled = true
+crt_file = "kafka_tls_cert.pem"
+key_file = "keyfile.key"
+# Uncomment and configure CA if needed:
+# ca_file = "/path/to/ca.pem"
+
+# ============================================
+# TRANSFORMS
+# ============================================
+
+# Parse JSON logs
+[transforms.parse_json]
+type = "remap"
+inputs = ["kafka_source"]
+source = '''
+. = parse_json!(.message)
+'''
+
+# Add metadata fields
+[transforms.add_metadata]
+type = "remap"
+inputs = ["parse_json"]
+source = '''
+.processed_at = now()
+.source = "kafka"
+.pipeline = "vector"
+'''
+
+# Filter out debug logs (optional - modify as needed)
+[transforms.filter_logs]
+type = "filter"
+inputs = ["add_metadata"]
+condition = '.level != "debug"'
+
+# ============================================
+# SINKS
+# ============================================
+
+# Console sink for debugging
+[sinks.console_debug]
+type = "console"
+inputs = ["filter_logs"]
+encoding.codec = "json"
+
+# Example: Elasticsearch sink (uncomment and configure as needed)
+# [sinks.elasticsearch]
+# type = "elasticsearch"
+# inputs = ["filter_logs"]
+# endpoints = ["https://elasticsearch.example.com:9200"]
+# bulk.index = "logs-%Y.%m.%d"
+#
+# [sinks.elasticsearch.tls]
+# verify_certificate = true
+
+# Example: File sink (uncomment and configure as needed)
+# [sinks.file_output]
+# type = "file"
+# inputs = ["filter_logs"]
+# path = "/var/log/vector/output-%Y-%m-%d.log"
+# encoding.codec = "json"
